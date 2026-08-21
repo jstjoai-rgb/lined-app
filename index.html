@@ -160,7 +160,13 @@ main[data-l="stack"]{grid-template-columns:212px 1fr;grid-template-rows:minmax(0
 main[data-l="stack"] .col:nth-child(1){grid-column:1;grid-row:1}
 main[data-l="stack"] .col:nth-child(3){grid-column:1;grid-row:2}
 main[data-l="stack"] #stage{grid-column:2;grid-row:1/3}
-main[data-l="hsplit"],main[data-l="spread"]{grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) 210px}
+main{position:relative}
+main[data-l="hsplit"],main[data-l="spread"]{grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) var(--bandh,46%)}
+#grip{display:none;position:absolute;left:0;right:0;height:12px;z-index:30;cursor:row-resize;touch-action:none;align-items:center;justify-content:center}
+main[data-l="hsplit"] #grip,main[data-l="spread"] #grip{display:flex}
+#grip::before{content:"";width:54px;height:4px;border-radius:2px;background:var(--line2);transition:background .15s}
+#grip:hover::before,#grip.drag::before{background:var(--china)}
+body.gripping{cursor:row-resize;user-select:none}
 main[data-l="hsplit"] #stage,main[data-l="spread"] #stage{grid-column:1/3;grid-row:1}
 main[data-l="hsplit"] .col:nth-child(1),main[data-l="spread"] .col:nth-child(1){grid-column:1;grid-row:2;border-top:1px solid var(--line)}
 main[data-l="hsplit"] .col:nth-child(3),main[data-l="spread"] .col:nth-child(3){grid-column:2;grid-row:2;border-top:1px solid var(--line)}
@@ -318,6 +324,7 @@ tr.ngr{color:var(--dim)}
   </div>
 
   <div class="col" id="stage"></div>
+  <div id="grip" title="Drag to resize · double-click for half"></div>
 
   <div class="col">
     <div class="timer" id="timer">00:00<span style="font-size:15px;color:var(--dim)">.0</span></div>
@@ -436,6 +443,16 @@ const DOORF={mono:'ui-monospace,"SF Mono",Menlo,monospace',
              serif:'"Iowan Old Style",Georgia,"Times New Roman",serif',
              sans:'-apple-system,"Helvetica Neue",Arial,sans-serif',
              round:'ui-rounded,"SF Pro Rounded",system-ui,sans-serif'};
+function placeGrip(){
+  const g=document.getElementById("grip"); if(!g)return;
+  const u=S.ui||{};
+  const m=document.getElementById("lineview");
+  if(!/hsplit|spread/.test(m.dataset.l||""))return;
+  const h=m.getBoundingClientRect().height;
+  const band=(u.bandh||"46%");
+  const px=String(band).indexOf("%")>0 ? h*parseFloat(band)/100 : parseFloat(band);
+  g.style.bottom=(px-6)+"px";
+}
 function applyUI(){
   const u=S.ui||(S.ui={layout:"three",pal:"graphite",flip:"0",door:"mono"});
   const v=PALS[u.pal]?PALS[u.pal].v:PALS.graphite.v;
@@ -444,6 +461,8 @@ function applyUI(){
   R.setProperty("--doorfont",DOORF[u.door]||DOORF.mono);
   const m=document.getElementById("lineview");
   m.dataset.l=u.layout; m.dataset.flip=u.flip;
+  m.style.setProperty("--bandh", u.bandh||"46%");
+  placeGrip();
   const tc=document.querySelector('meta[name="theme-color"]');
   if(tc)tc.setAttribute("content",v.bg);
   document.querySelectorAll("[data-flip]").forEach(b=>{if(b.tagName==="BUTTON")b.classList.toggle("on",b.dataset.flip===u.flip)});
@@ -471,7 +490,7 @@ function blank(){
     times:{call:"",first:"",lunchOut:"",lunchIn:"",camWrap:"",wrap:""},
     scenes:[],setups:[],takes:[],lines:[],
     cur:{scene:null,setup:null},pdfName:null,
-    ui:{layout:"three",pal:"graphite",flip:"0",door:"mono"}
+    ui:{layout:"three",pal:"graphite",flip:"0",door:"mono",bandh:"46%"}
   };
 }
 function today(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
@@ -756,6 +775,43 @@ function drawLines(){
     svg.innerHTML=out;
   });
 }
+
+/* ════════════ THE DIVIDER ════════════ */
+(function(){
+  const g=document.getElementById("grip");
+  if(!g)return;
+  let dragging=false;
+  function set(px){
+    const m=document.getElementById("lineview");
+    const h=m.getBoundingClientRect().height;
+    const min=110, max=h-150;
+    px=Math.max(min,Math.min(max,px));
+    const pct=(px/h*100).toFixed(1)+"%";
+    S.ui.bandh=pct; m.style.setProperty("--bandh",pct);
+    g.style.bottom=(px-6)+"px";
+  }
+  g.addEventListener("pointerdown",e=>{
+    dragging=true; g.classList.add("drag"); document.body.classList.add("gripping");
+    g.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  g.addEventListener("pointermove",e=>{
+    if(!dragging)return;
+    const m=document.getElementById("lineview").getBoundingClientRect();
+    set(m.bottom-e.clientY);
+  });
+  function end(){
+    if(!dragging)return;
+    dragging=false; g.classList.remove("drag"); document.body.classList.remove("gripping");
+    save(); renderStage();
+  }
+  g.addEventListener("pointerup",end);
+  g.addEventListener("pointercancel",end);
+  g.addEventListener("dblclick",()=>{
+    S.ui.bandh="50%";
+    document.getElementById("lineview").style.setProperty("--bandh","50%");
+    placeGrip(); save(); renderStage(); toast("Half and half");
+  });
+})();
 
 /* ════════════ DRAWING ════════════ */
 let tool="line",wavy=false,penOnly=false;
@@ -1175,7 +1231,7 @@ document.addEventListener("keydown",e=>{
 });
 setInterval(()=>{const d=new Date();document.getElementById("clock").textContent=pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())},1000);
 window.addEventListener("beforeunload",e=>{if(rolling){e.preventDefault();e.returnValue=""}});
-let rz=null;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(renderStage,180)});
+let rz=null;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{renderStage();placeGrip()},180)});
 
 /* ════════════ BOOT ════════════ */
 (async function(){

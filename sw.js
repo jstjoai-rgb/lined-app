@@ -2,13 +2,14 @@
    Bump CACHE on every deploy. Network-first for the app shell so a new
    version is never stuck behind a stale cache; cache-first for everything
    else so the app opens instantly and works with no signal on a stage. */
-const CACHE = "lined-v11";
+const CACHE = "lined-v12";
 const SHELL = [
   "./",
   "./index.html",
   "./deck.html",
   "./notes.html",
   "./ctrl-markup.js",
+  "./ctrlgo.html",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
