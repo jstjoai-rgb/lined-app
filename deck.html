@@ -1,0 +1,524 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12161A">
+<title>LINED. — the case</title>
+<!-- ═══════════════ LINED. — the door ═══════════════
+     A doorman, not a lock. The answer is stored as a hash so it isn't sitting
+     in the source as plain text, but anyone with devtools can remove the
+     overlay. For real protection use the host's password setting.
+
+     TO CHANGE THE ANSWER — in any browser console:
+       crypto.subtle.digest("SHA-256", new TextEncoder().encode("your answer"))
+         .then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
+     …then also update FALLBACK below with: btoa("your answer")
+     Matching ignores case, punctuation and extra spaces.
+     ═══════════════════════════════════════════════ -->
+<style>
+#gate{position:fixed;inset:0;z-index:9999;background:var(--bg,#12161A);color:var(--chalk,#E4EAEF);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  font-family:var(--doorfont,ui-monospace),"SF Mono",Menlo,monospace;padding:24px}
+#gate.gone{display:none}
+#gate .top{position:absolute;top:22px;left:26px;font-size:14px;font-weight:700;letter-spacing:.16em}
+#gate .top i{font-style:normal;color:var(--china,#E5533D)}
+#gate .card{position:relative;background:var(--paper,#FBF7EE);color:var(--papertext,#15181B);
+  width:100%;max-width:560px;padding:54px 60px 58px;box-shadow:0 22px 60px rgba(0,0,0,.34);border-radius:2px}
+#gate .rule{position:absolute;top:0;right:64px;bottom:0;width:0}
+#gate .rule svg{position:absolute;top:0;left:-9px;height:100%;width:18px}
+#gate .slug{font-size:11px;letter-spacing:.22em;opacity:.5;margin-bottom:52px}
+#gate .cue{font-size:12px;letter-spacing:.36em;opacity:.55;text-align:center;margin-bottom:16px}
+#gate .ask{font-size:31px;font-weight:400;line-height:1.25;text-align:center;margin:0 0 40px}
+#gate .ask i{font-style:normal;color:var(--china2,#C0392B)}
+#gate input{display:block;background:transparent;border:0;border-bottom:1px solid currentColor;
+  color:inherit;font:inherit;font-size:20px;text-align:center;padding:9px 6px;
+  width:82%;margin:0 auto;outline:0;letter-spacing:.03em;transition:border-color .35s ease}
+#gate input{opacity:.92}
+#gate input:focus{border-bottom-color:var(--china2,#C0392B);opacity:1}
+#gate input::placeholder{opacity:.3}
+#gate .hint{font-size:12.5px;opacity:.6;margin-top:26px;min-height:30px;line-height:1.8;
+  text-align:center;transition:opacity .3s ease}
+#gate .hint b{color:var(--china2,#C0392B);font-weight:400;opacity:1}
+#gate .hint.fade{opacity:0}
+#gate .foot{font-size:10.5px;letter-spacing:.14em;color:var(--dim,#7E8B95)}
+@keyframes settle{0%{transform:translateY(-3px);opacity:.5}100%{transform:translateY(0);opacity:1}}
+#gate.again input{animation:settle .5s ease}
+@media (prefers-reduced-motion:reduce){#gate.again input{animation:none}}
+@media (max-width:520px){#gate .card{padding:30px 24px 34px}#gate .rule{right:26px}}
+</style>
+
+<div id="gate">
+  <div class="top">LINED<i>.</i></div>
+  <div class="card">
+    <div class="rule"><svg viewBox="0 0 18 400" preserveAspectRatio="none" aria-hidden="true">
+      <line x1="9" y1="26" x2="9" y2="374" stroke="var(--china2,#C0392B)" stroke-width="2"/>
+      <line x1="2" y1="26" x2="16" y2="26" stroke="var(--china2,#C0392B)" stroke-width="2"/>
+      <line x1="2" y1="374" x2="16" y2="374" stroke="var(--china2,#C0392B)" stroke-width="2"/>
+    </svg></div>
+    <div class="slug">INT. STAGE — CONTINUOUS</div>
+    <div class="cue">YOU</div>
+    <div class="ask">What's my line again<i>?</i></div>
+    <input id="gk" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="…">
+    <div class="hint" id="gh">Take your time. The script supervisor has it.</div>
+  </div>
+  <div class="foot">a prototype — please keep it between us</div>
+</div>
+
+<script>
+(function(){
+  var ANSWER   = "90e4f80c17ced4daa65e8c3c96e131575713a23218c612481691315914278507";
+  var FALLBACK = "eW91IHNhaWQgdHVlc2RheQ==";   // used only where crypto.subtle is unavailable
+  var HINTS = [
+    "Take your time. The script supervisor has it.",
+    "Not that one. Try again whenever you're ready.",
+    "It's the first thing she says in the scene.",
+    "Three words. She says it twice.",
+    "Starts with <b>you</b>."
+  ];
+  var gate = document.getElementById("gate"),
+      inp  = document.getElementById("gk"),
+      hint = document.getElementById("gh"),
+      misses = 0;
+
+  function norm(s){ return s.toLowerCase().replace(/[^\w\s]/g,"").replace(/\s+/g," ").trim(); }
+
+  // crypto.subtle only exists in a secure context — fall back where it doesn't
+  function check(v){
+    if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+      return crypto.subtle.digest("SHA-256", new TextEncoder().encode(v))
+        .then(function(b){
+          return [].slice.call(new Uint8Array(b))
+            .map(function(x){ return x.toString(16).padStart(2,"0"); }).join("") === ANSWER;
+        })
+        .catch(function(){ return v === atob(FALLBACK); });
+    }
+    return Promise.resolve(v === atob(FALLBACK));
+  }
+
+  function say(html){
+    hint.classList.add("fade");
+    setTimeout(function(){ hint.innerHTML = html; hint.classList.remove("fade"); }, 220);
+  }
+  function open_(){
+    gate.classList.add("gone");
+    try{ localStorage.setItem("lined:door", ANSWER); }catch(e){}
+  }
+  try{ if(localStorage.getItem("lined:door") === ANSWER) open_(); }catch(e){}
+
+  inp.addEventListener("keydown", function(e){
+    if(e.key !== "Enter") return;
+    var v = norm(inp.value);
+    if(!v) return;
+    check(v).then(function(ok){
+      if(ok){ say("<b>That's the one.</b>"); setTimeout(open_, 620); return; }
+      misses++;
+      gate.classList.add("again");
+      setTimeout(function(){ gate.classList.remove("again"); }, 520);
+      say(HINTS[Math.min(misses, HINTS.length - 1)]);
+      inp.select();
+    });
+  });
+
+  if(!gate.classList.contains("gone")) setTimeout(function(){ inp.focus(); }, 300);
+})();
+</script>
+
+<style>
+:root{
+  --bg:#12161A; --panel:#1B2127; --panel2:#0F1317; --line:#2E3841; --line2:#3E4A55;
+  --fg:#E4EAEF; --dim:#7E8B95; --accent:#E5533D; --accent2:#C0392B; --go:#5FA88C; --warn:#D8A13C;
+  --paper:#FFFFFF; --papertext:#15181B;
+  --mono:ui-monospace,"SF Mono",Menlo,"DejaVu Sans Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--fg);font:15px/1.65 var(--mono);
+  transition:background .45s ease,color .45s ease}
+button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line2);
+  border-radius:3px;padding:7px 12px;cursor:pointer;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+button:hover{border-color:var(--fg)}
+button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+input,select,textarea{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line2);
+  color:inherit;font:inherit;font-size:15px;padding:8px 2px;outline:0;border-radius:0}
+input:focus,select:focus,textarea:focus{border-bottom-color:var(--accent)}
+textarea{min-height:90px;resize:vertical}
+
+#bar{position:fixed;top:0;left:0;right:0;height:3px;background:var(--line);z-index:60}
+#bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .35s ease}
+#brand{position:fixed;top:20px;left:26px;z-index:50;font-size:14px;font-weight:700;letter-spacing:.16em}
+#brand i{font-style:normal;color:var(--accent)}
+#count{position:fixed;top:22px;right:26px;z-index:50;font-size:10px;letter-spacing:.2em;color:var(--dim)}
+#nav{position:fixed;bottom:18px;right:24px;z-index:50;display:flex;gap:6px}
+#dots{position:fixed;bottom:24px;left:26px;z-index:50;display:flex;gap:5px}
+#dots b{width:6px;height:6px;border-radius:50%;background:var(--line2);cursor:pointer;display:block}
+#dots b.on{background:var(--accent);transform:scale(1.35)}
+
+.slide{position:absolute;inset:0;padding:74px 60px 70px;overflow:auto;opacity:0;pointer-events:none;
+  transform:translateY(10px);transition:opacity .38s ease,transform .38s ease}
+.slide.on{opacity:1;pointer-events:auto;transform:none}
+h1{font-size:40px;line-height:1.14;font-weight:700;letter-spacing:.01em;margin:0 0 18px}
+h2{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);font-weight:400;margin:0 0 22px}
+h3{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:400;margin:0 0 8px}
+p{margin:0 0 14px;max-width:78ch;color:var(--fg)}
+p.dim{color:var(--dim)}
+.big{font-size:30px;line-height:1.3;font-weight:400;max-width:22ch}
+.accent{color:var(--accent)}
+.cols{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-top:26px}
+.card{border:1px solid var(--line);background:var(--panel2);padding:16px 18px}
+.card b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+.card span{color:var(--dim);font-size:13px;line-height:1.6;display:block}
+.rule{height:2px;width:34px;background:var(--accent);margin-bottom:12px}
+
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}
+th{text-align:left;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+  font-weight:400;border-bottom:1px solid var(--line2);padding:7px 8px}
+th.me{color:var(--accent)}
+td{padding:6px 8px;border-bottom:1px solid var(--line)}
+td.c{text-align:center}
+td.y{color:var(--fg)}td.y.me{color:var(--accent);font-weight:700}
+td.n{color:var(--line2)}
+tr td:last-child{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+
+.lays{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px}
+.lay{border:1px solid var(--line);padding:10px;cursor:pointer;background:var(--panel2)}
+.lay.on{border-color:var(--accent)}
+.lay svg{width:100%;height:88px;display:block}
+.lay b{display:block;font-size:11px;letter-spacing:.1em;margin-top:8px}
+.lay span{font-size:11px;color:var(--dim);display:block;line-height:1.5}
+
+.pals{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));margin-top:10px}
+.pal{cursor:pointer;border:1px solid var(--line);padding:0;overflow:hidden;background:none}
+.pal .chip{height:52px;display:block;position:relative}
+.pal .chip i{position:absolute;right:6px;bottom:6px;width:12px;height:12px;border-radius:50%}
+.pal .chip u{position:absolute;left:28%;top:8px;bottom:8px;width:44%;text-decoration:none;display:block}
+.pal em{display:block;font-style:normal;font-size:10px;letter-spacing:.06em;padding:6px;color:var(--dim);
+  text-align:left;text-transform:uppercase}
+.pal.on{outline:2px solid var(--accent);outline-offset:-2px}
+
+.door{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center;margin-top:10px}
+.doorcard{background:var(--paper);color:var(--papertext);padding:40px 44px;position:relative;
+  box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.doorcard::after{content:"";position:absolute;top:22px;bottom:22px;right:26px;width:2px;background:var(--accent2)}
+.doorcard .slug{font-size:10px;letter-spacing:.22em;opacity:.5;margin-bottom:34px}
+.doorcard .cue{font-size:11px;letter-spacing:.36em;opacity:.55;text-align:center;margin-bottom:12px}
+.doorcard .ask{font-size:27px;text-align:center;margin-bottom:30px;line-height:1.25}
+.doorcard .ask i{font-style:normal;color:var(--accent2)}
+.doorcard .slot{height:1px;background:currentColor;opacity:.25;width:64%;margin:0 auto}
+.doorcard .hint{font-size:11px;opacity:.55;text-align:center;margin-top:26px}
+[data-df="mono"] .doorcard{font-family:var(--mono)}
+[data-df="serif"] .doorcard{font-family:"Iowan Old Style",Georgia,serif}
+[data-df="sans"] .doorcard{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif}
+[data-df="round"] .doorcard{font-family:ui-rounded,"SF Pro Rounded",system-ui,sans-serif}
+
+.typeset{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-top:14px}
+.tt{border-bottom:1px solid var(--line);padding:14px 0;cursor:pointer}
+.tt.on{border-bottom-color:var(--accent)}
+.tt .w{font-size:28px;letter-spacing:.02em}
+.tt .w i{font-style:normal;color:var(--accent)}
+.tt small{display:block;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-top:6px}
+
+.form{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:8px;max-width:1000px}
+.field label{display:block;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.send{margin-top:22px;background:var(--accent);border-color:var(--accent);color:#fff;padding:13px 26px;font-size:12px}
+.msg{margin-top:14px;font-size:13px;min-height:22px;color:var(--dim)}
+.msg.bad{color:var(--accent)}
+.msg.good{color:var(--go)}
+.hidden{display:none}
+@media (max-width:820px){
+  .slide{padding:64px 24px 76px}
+  h1{font-size:28px}.big{font-size:22px}
+  .door{grid-template-columns:1fr}
+}
+</style>
+
+<div id="bar"><i id="barfill"></i></div>
+<div id="brand">LINED<i>.</i></div>
+<div id="count">01 / 09</div>
+<div id="dots"></div>
+<div id="nav"><button id="prev">‹</button><button id="next">›</button></div>
+
+<div id="deck"></div>
+
+<script>
+"use strict";
+
+const PALS = {
+ graphite:{n:"Graphite",note:"Cool neutral dark, china-marker red. Reads as a tool.",v:{bg:"#12161A",panel:"#1B2127",panel2:"#0F1317",line:"#2E3841",line2:"#3E4A55",fg:"#E4EAEF",dim:"#7E8B95",accent:"#E5533D",accent2:"#C0392B",go:"#5FA88C",warn:"#D8A13C",paper:"#FFFFFF",papertext:"#15181B"}},
+ paper:{n:"Paper",note:"Light. Closest to the thing it replaces.",v:{bg:"#EDEBE4",panel:"#F7F6F1",panel2:"#FFFFFF",line:"#D3D1C7",line2:"#B4B2A9",fg:"#1C1E1A",dim:"#7A7C72",accent:"#C0392B",accent2:"#96291D",go:"#3F7A5E",warn:"#A87A1E",paper:"#FFFFFF",papertext:"#15181B"}},
+ stage:{n:"Stage",note:"Near-black for a dark set.",v:{bg:"#08090B",panel:"#101316",panel2:"#0A0C0E",line:"#1E242A",line2:"#2C343B",fg:"#C8D0D6",dim:"#67727B",accent:"#D6452F",accent2:"#A83322",go:"#4A8A70",warn:"#B98A2E",paper:"#E8E6E0",papertext:"#15181B"}},
+ ink:{n:"Ink & amber",note:"Warm dark, sodium accent.",v:{bg:"#161311",panel:"#211D19",panel2:"#12100E",line:"#38312A",line2:"#4A4038",fg:"#EDE6DC",dim:"#948A7E",accent:"#E0A33C",accent2:"#C0392B",go:"#7FA25B",warn:"#E0A33C",paper:"#FBF8F1",papertext:"#1A1713"}},
+ slate:{n:"Slate blue",note:"Softer than graphite over a long day.",v:{bg:"#141A21",panel:"#1D2731",panel2:"#101720",line:"#2C3A47",line2:"#3D4E5D",fg:"#DCE6EE",dim:"#7A8B9A",accent:"#E2604A",accent2:"#B8442F",go:"#5B9E90",warn:"#D8A13C",paper:"#FFFFFF",papertext:"#141A21"}},
+ kraft:{n:"Kraft",note:"Paper-bag brown, soft white page.",v:{bg:"#2A241D",panel:"#372F26",panel2:"#221D17",line:"#4A4034",line2:"#5E5244",fg:"#EDE4D6",dim:"#9C8F7C",accent:"#C0563A",accent2:"#9E4127",go:"#7A8B5A",warn:"#C99A3E",paper:"#FBF7EF",papertext:"#2A241D"}},
+ clay:{n:"Clay",note:"Terracotta and stone. Handmade.",v:{bg:"#241C19",panel:"#332723",panel2:"#1C1512",line:"#493831",line2:"#5E4940",fg:"#F0E3DA",dim:"#A08A7E",accent:"#D2653F",accent2:"#A8482A",go:"#7D9070",warn:"#D8A05A",paper:"#FCF6F0",papertext:"#241C19"}},
+ moss:{n:"Moss",note:"Deep olive, bone page. Least fatiguing.",v:{bg:"#1D211A",panel:"#282D24",panel2:"#161A14",line:"#3A4034",line2:"#4C5445",fg:"#E6EADF",dim:"#8B9481",accent:"#C85A3C",accent2:"#A3452B",go:"#7FA25B",warn:"#C9A14E",paper:"#F8F6EE",papertext:"#1D211A"}},
+ sand:{n:"Sand",note:"Warm putty ground instead of white.",v:{bg:"#E2DACB",panel:"#EFE9DD",panel2:"#F8F4EB",line:"#C9BFAC",line2:"#AA9E88",fg:"#2B2620",dim:"#7E7466",accent:"#B24B2C",accent2:"#8E3A20",go:"#5E7A4E",warn:"#A87A1E",paper:"#FFFDF8",papertext:"#2B2620"}},
+ goldenrod:{n:"Goldenrod",note:"Named for the revision colour.",v:{bg:"#1F1D18",panel:"#2B2820",panel2:"#171612",line:"#413C30",line2:"#564F3F",fg:"#EDE8D9",dim:"#968F7B",accent:"#C0392B",accent2:"#9A2B20",go:"#75894F",warn:"#D9AE3C",paper:"#F5DFA0",papertext:"#221F16"}},
+ cream:{n:"Cream & persimmon",note:"Warm cream, one hot pop.",v:{bg:"#F0E8D8",panel:"#F8F3E8",panel2:"#FFFDF7",line:"#DBD1BC",line2:"#BEB096",fg:"#24211C",dim:"#7C7364",accent:"#D2542A",accent2:"#A8401D",go:"#5E7F5E",warn:"#C08A1E",paper:"#FFFFFF",papertext:"#24211C"}},
+ oat:{n:"Oat & rust",note:"Muted rust. Ages better.",v:{bg:"#E8DFCD",panel:"#F3ECDD",panel2:"#FBF7EE",line:"#D2C6AE",line2:"#B3A489",fg:"#2A251E",dim:"#7A7060",accent:"#A8503A",accent2:"#853A26",go:"#61785A",warn:"#B58426",paper:"#FFFDF9",papertext:"#2A251E"}},
+ linen:{n:"Linen & ochre",note:"Palest ground, mustard pop.",v:{bg:"#F5F0E4",panel:"#FBF8F0",panel2:"#FFFFFB",line:"#E0D8C5",line2:"#C2B69E",fg:"#262319",dim:"#7F7767",accent:"#C68A1C",accent2:"#9C6A10",go:"#6B8257",warn:"#C68A1C",paper:"#FFFFFF",papertext:"#262319"}},
+ bone:{n:"Bone & sage",note:"Sage is calm, coral is the alarm.",v:{bg:"#EFEDE3",panel:"#F7F6EF",panel2:"#FFFFFA",line:"#D8D6C8",line2:"#B7B5A4",fg:"#23261F",dim:"#767C6E",accent:"#D2603F",accent2:"#A8452A",go:"#6E8F6E",warn:"#BE8C2C",paper:"#FFFFFF",papertext:"#23261F"}},
+ indigo:{n:"Cream & indigo",note:"Red kept only for the coverage line.",v:{bg:"#F1EADB",panel:"#F9F5EC",panel2:"#FFFDF8",line:"#DAD1BE",line2:"#B9AC94",fg:"#1E2230",dim:"#6E7488",accent:"#43539B",accent2:"#B23A22",go:"#4F7F6B",warn:"#BE8C2C",paper:"#FFFFFF",papertext:"#1E2230"}},
+ contrast:{n:"High contrast",note:"For direct sun. Ugly on purpose.",v:{bg:"#000000",panel:"#0E0E0E",panel2:"#000000",line:"#4A4A4A",line2:"#6E6E6E",fg:"#FFFFFF",dim:"#B4B4B4",accent:"#FF4B2B",accent2:"#FF4B2B",go:"#39D98A",warn:"#FFC53D",paper:"#FFFFFF",papertext:"#000000"}}
+};
+
+const CHOICE = { layout:"", palette:"graphite", door:"mono", type:"", caseform:"" };
+
+/* ---------- little wireframes, drawn from the same shapes as the app ---------- */
+function wire(kind){
+  const P='fill="var(--paper)"', R='fill="var(--panel)"', L='stroke="var(--accent2)" stroke-width="2"';
+  const rails=(x,w)=>`<rect x="${x}" y="14" width="${w}" height="70" ${R}/>`+
+    [0,1,2].map(i=>`<rect x="${x+3}" y="${19+i*11}" width="${w-6}" height="7" fill="var(--line2)"/>`).join("");
+  const page=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" ${P}/>`+
+    `<line x1="${x+w*0.72}" y1="${y+5}" x2="${x+w*0.72}" y2="${y+h-5}" ${L}/>`+
+    [0,1,2,3].map(i=>`<line x1="${x+4}" y1="${y+8+i*8}" x2="${x+w*0.55}" y2="${y+8+i*8}" stroke="var(--line2)" stroke-width="1.5"/>`).join("");
+  let inner="";
+  if(kind==="three")      inner=rails(2,26)+page(32,14,88,70)+rails(124,34);
+  else if(kind==="stack") inner=rails(2,34)+page(40,14,118,70);
+  else if(kind==="hsplit")inner=page(52,14,56,46)+`<rect x="2" y="64" width="156" height="20" ${R}/>`+
+                                [0,1,2,3].map(i=>`<rect x="${6+i*39}" y="68" width="33" height="12" fill="var(--line2)"/>`).join("");
+  else if(kind==="spread")inner=page(24,14,52,46)+page(84,14,52,46)+`<rect x="2" y="64" width="156" height="20" ${R}/>`+
+                                [0,1,2,3].map(i=>`<rect x="${6+i*39}" y="68" width="33" height="12" fill="var(--line2)"/>`).join("");
+  else if(kind==="dock")  inner=page(38,14,84,60)+`<rect x="2" y="78" width="156" height="10" ${R}/>`;
+  else if(kind==="split") inner=page(14,14,102,70)+rails(122,36);
+  else                    inner=page(30,14,100,70)+`<rect x="4" y="18" width="30" height="34" ${R}/>`+
+                                `<rect x="126" y="18" width="32" height="42" ${R}/>`;
+  return `<svg viewBox="0 0 160 92" preserveAspectRatio="xMidYMid meet">
+    <rect x="0" y="0" width="160" height="92" fill="var(--bg)"/>
+    <rect x="0" y="0" width="160" height="10" fill="var(--panel)"/>
+    <rect x="4" y="3" width="16" height="4" fill="var(--accent)"/>${inner}</svg>`;
+}
+
+const LAYS=[["hsplit","Horizontal split","Page above, the day in a band below. For portrait."],
+            ["spread","Side by side","Two pages — for a scene that runs over the break."],
+            ["dock","Bottom dock","Biggest page by far. Controls in one bar."],
+            ["stack","Left stack","One rail instead of two."],
+            ["three","Three columns","What it does now. In landscape it costs nothing."],
+            ["split","Split","Page and takes only."],
+            ["pagefirst","Page first","Rails float over the page."]];
+
+const TYPES=[["mono",'ui-monospace,"SF Mono",Menlo,monospace',"Mono — a document"],
+             ["serif",'"Iowan Old Style",Georgia,serif',"Serif — a title card"],
+             ["sans",'-apple-system,"Helvetica Neue",Arial,sans-serif',"Sans — an app"],
+             ["round",'ui-rounded,"SF Pro Rounded",system-ui,sans-serif',"Rounded — friendlier"]];
+
+const ROWS=[["Draw a coverage line the way you always have",1,1,1,1],
+            ["Straight vs wavy — seen vs heard",1,1,0,1],
+            ["Take log with slate, duration, circled takes",0,0,1,1],
+            ["Log written from the lines, not typed again",0,0,0,1],
+            ["Reads the script text on the page",0,0,0,1],
+            ["Tells you which lines have NO coverage",0,0,0,1],
+            ["Reports what is only ever heard, never seen",0,0,0,1],
+            ["Coverage percentage per scene",0,0,0,1],
+            ["Works with no battery",1,0,0,0]];
+
+/* ---------- the slides ---------- */
+const SLIDES=[
+
+`<h2>Script supervisor software</h2>
+ <h1 style="font-size:60px;letter-spacing:.06em">LINED<span class="accent">.</span></h1>
+ <p class="big" style="margin-top:8px">The line you already draw, doing the paperwork for you.</p>
+ <p class="dim" style="margin-top:34px">Build v1 · prototype · for review</p>
+ <p class="dim" style="font-size:12px">Arrow keys, or swipe. Nine slides.</p>`,
+
+`<h2>The problem</h2>
+ <h1>Every tool stores what you drew.<br>None of them understand it.</h1>
+ <p>A script supervisor's real job isn't writing things down. It's knowing, at 6pm, that everything got shot.</p>
+ <div class="cols">
+   <div class="card"><div class="rule"></div><b>Paper</b><span>Fast, reliable, no battery. But the arithmetic is in your head, and the log gets written twice.</span></div>
+   <div class="card"><div class="rule"></div><b>Scriptation · GoodNotes</b><span>Fine PDF annotators. The coverage line is a pen stroke — pixels. The app can't tell you what's missing.</span></div>
+   <div class="card"><div class="rule"></div><b>ScriptE · Moviola</b><span>Real logs. But lining and logging are two separate acts: you draw, then you type it in again.</span></div>
+ </div>
+ <p style="margin-top:26px;border-left:2px solid var(--accent);padding-left:16px">
+   So the one thing that actually goes wrong — a piece of the scene never got a line through it, and nobody
+   noticed until the company moved on — is still caught by a human eyeballing a page at wrap.</p>`,
+
+`<h2>The idea</h2>
+ <h1>In every other app the line is ink.<br><span class="accent">In LINED. the line is data.</span></h1>
+ <p>She draws exactly the line she has always drawn. The app knows it belongs to setup 14C, that 14C belongs to
+ scene 14, and that the stroke crosses these particular lines of dialogue. Everything else follows.</p>
+ <div class="cols">
+   <div class="card"><div class="rule"></div><b>It knows what you haven't shot</b><span>Reads the script text and flags every line with no coverage — live, on the floor.</span></div>
+   <div class="card"><div class="rule"></div><b>It separates seen from heard</b><span>Flip to wavy mid-stroke and that stretch is logged off-camera, then reported.</span></div>
+   <div class="card"><div class="rule"></div><b>The paperwork is a by-product</b><span>Editor's log, CSV, daily progress, screen time, ratio. Nothing typed twice.</span></div>
+ </div>`,
+
+`<h2>Head to head</h2>
+ <h1 style="font-size:30px">What each one can actually tell you</h1>
+ <table><thead><tr><th></th><th style="text-align:center">Paper</th><th style="text-align:center">Scriptation</th>
+ <th style="text-align:center">ScriptE</th><th class="me" style="text-align:center">LINED.</th></tr></thead><tbody>
+ ${ROWS.map(r=>`<tr><td>${r[0]}</td>`+[1,2,3,4].map(j=>
+    `<td class="c ${r[j]?"y":"n"}${j===4?" me":""}">${r[j]?"●":"—"}</td>`).join("")+"</tr>").join("")}
+ </tbody></table>
+ <p class="dim" style="margin-top:18px;font-size:13px">Paper still wins the last row, permanently. That's why the
+ gesture stays identical and the app works offline.</p>`,
+
+`<h2>Seven ways to arrange it</h2>
+ <h1 style="font-size:30px">Tap the one that looks right</h1>
+ <div class="lays" id="lays">
+   ${LAYS.map(l=>`<div class="lay" data-lay="${l[0]}">${wire(l[0])}<b>${l[1]}</b><span>${l[2]}</span></div>`).join("")}
+ </div>
+ <p class="dim" style="margin-top:18px;font-size:13px">Every one of them mirrors for a left-handed scripty — one toggle.
+ In landscape they all give the page the same room; the choice only changes page size in portrait.</p>`,
+
+`<h2>Sixteen palettes</h2>
+ <h1 style="font-size:30px">Tap one — this whole deck changes with it</h1>
+ <div class="pals" id="pals">
+   ${Object.keys(PALS).map(k=>{const v=PALS[k].v;return `<button class="pal" data-pal="${k}">
+     <span class="chip" style="background:${v.bg}"><u style="background:${v.paper}"></u><i style="background:${v.accent}"></i></span>
+     <em>${PALS[k].n}</em></button>`}).join("")}
+ </div>
+ <p class="dim" id="palnote" style="margin-top:16px;font-size:13px"></p>`,
+
+`<h2>The door</h2>
+ <h1 style="font-size:30px">It's a prototype, so it asks</h1>
+ <div class="door" id="doorwrap" data-df="mono">
+   <div class="doorcard">
+     <div class="slug">INT. STAGE — CONTINUOUS</div>
+     <div class="cue">YOU</div>
+     <div class="ask">What's my line again<i>?</i></div>
+     <div class="slot"></div>
+     <div class="hint">Take your time. The script supervisor has it.</div>
+   </div>
+   <div>
+     <p>“Line?” is what an actor calls when they drop one, and the script supervisor is the person who feeds it
+     back. The door asks the same thing the job answers all day.</p>
+     <p class="dim">Get it wrong and it helps, one hint at a time, rather than scolding.</p>
+     <h3 style="margin-top:22px">Type</h3>
+     <div style="display:flex;gap:6px;flex-wrap:wrap">
+       ${TYPES.map(t=>`<button data-df="${t[0]}"${t[0]==="mono"?' class="on"':''}>${t[2].split(" — ")[0]}</button>`).join("")}
+     </div>
+     <p class="dim" style="margin-top:18px;font-size:12px">It borrows whatever palette you picked, so it can never
+     arrive looking like a different product.</p>
+   </div>
+ </div>`,
+
+`<h2>The name</h2>
+ <h1 style="font-size:30px">Same word, twelve voices — tap a favourite</h1>
+ <div class="typeset" id="typeset">
+   ${TYPES.concat([["cond",'"Helvetica Neue Condensed Bold","Arial Narrow",sans-serif',"Condensed — signage"],
+                   ["ser2",'"Times New Roman",Times,serif',"Classic serif — old Hollywood"]])
+     .map(t=>`<div class="tt" data-type="${t[0]}"><div class="w" style="font-family:${t[1].replace(/"/g,"&quot;")}">LINED<i>.</i></div><small>${t[2]}</small></div>`).join("")}
+ </div>
+ <div class="typeset" style="margin-top:6px">
+   ${TYPES.slice(0,3).map(t=>`<div class="tt" data-type="lower-${t[0]}"><div class="w" style="font-family:${t[1].replace(/"/g,"&quot;")}">Lined<i>.</i></div><small>sentence case — ${t[2].split(" — ")[0]}</small></div>`).join("")}
+ </div>
+ <p class="dim" style="margin-top:14px;font-size:13px">Caps shout the name. Sentence case says it. The period is the
+ full stop at the end of a lined page — or a typo people delete. Your call.</p>`,
+
+`<h2>Your call</h2>
+ <h1 style="font-size:30px">Send it and it lands with me</h1>
+ <p class="dim">Whatever you tapped is already filled in. Add anything you like — it goes straight into my notes.</p>
+ <div class="form">
+   <div class="field"><label>Your name</label><input id="v-who" placeholder="—"></div>
+   <div class="field"><label>Passphrase</label><input id="v-pass" type="password" placeholder="—"></div>
+   <div class="field"><label>Layout</label><input id="v-lay" placeholder="tap one on slide 05"></div>
+   <div class="field"><label>Palette</label><input id="v-pal" placeholder="tap one on slide 06"></div>
+   <div class="field"><label>The door</label><input id="v-door"></div>
+   <div class="field"><label>The name</label><input id="v-type" placeholder="tap one on slide 08"></div>
+ </div>
+ <div class="field" style="margin-top:18px;max-width:1000px"><label>Anything else</label>
+   <textarea id="v-note" placeholder="Be blunt. “This is wrong” beats “maybe consider”."></textarea></div>
+ <button class="send" id="v-send">Send it</button>
+ <div class="msg" id="v-msg"></div>`
+];
+
+/* ---------- deck mechanics ---------- */
+const deck=document.getElementById("deck");
+deck.innerHTML=SLIDES.map((s,i)=>`<section class="slide" data-i="${i}">${s}</section>`).join("");
+const slides=[...document.querySelectorAll(".slide")];
+document.getElementById("dots").innerHTML=slides.map((_,i)=>`<b data-go="${i}"></b>`).join("");
+let at=0;
+
+function go(i){
+  at=Math.max(0,Math.min(slides.length-1,i));
+  slides.forEach((s,k)=>s.classList.toggle("on",k===at));
+  document.querySelectorAll("#dots b").forEach((d,k)=>d.classList.toggle("on",k===at));
+  document.getElementById("count").textContent=
+    String(at+1).padStart(2,"0")+" / "+String(slides.length).padStart(2,"0");
+  document.getElementById("barfill").style.width=((at+1)/slides.length*100)+"%";
+  if(at===slides.length-1)fillVote();
+}
+function paint(k){
+  CHOICE.palette=k;
+  const v=PALS[k].v, R=document.documentElement.style;
+  for(const key in v)R.setProperty("--"+key,v[key]);
+  const tc=document.querySelector('meta[name="theme-color"]');
+  if(tc)tc.setAttribute("content",v.bg);
+  document.querySelectorAll("[data-pal]").forEach(b=>b.classList.toggle("on",b.dataset.pal===k));
+  const n=document.getElementById("palnote");
+  if(n)n.innerHTML="<b>"+PALS[k].n+"</b> — "+PALS[k].note;
+}
+function fillVote(){
+  const g=id=>document.getElementById(id);
+  if(g("v-lay")&&CHOICE.layout)g("v-lay").value=CHOICE.layout;
+  if(g("v-pal"))g("v-pal").value=PALS[CHOICE.palette].n;
+  if(g("v-door"))g("v-door").value=CHOICE.door;
+  if(g("v-type")&&CHOICE.type)g("v-type").value=CHOICE.type;
+}
+
+document.addEventListener("click",e=>{
+  const t=e.target;
+  if(t.id==="next")return go(at+1);
+  if(t.id==="prev")return go(at-1);
+  const d=t.closest("[data-go]"); if(d)return go(+d.dataset.go);
+  const lay=t.closest("[data-lay]");
+  if(lay){CHOICE.layout=lay.querySelector("b").textContent;
+    document.querySelectorAll("[data-lay]").forEach(x=>x.classList.remove("on"));
+    lay.classList.add("on");return}
+  const pal=t.closest("[data-pal]"); if(pal)return paint(pal.dataset.pal);
+  const df=t.closest("button[data-df]");
+  if(df){CHOICE.door=df.dataset.df;
+    document.getElementById("doorwrap").dataset.df=df.dataset.df;
+    document.querySelectorAll("button[data-df]").forEach(x=>x.classList.remove("on"));
+    df.classList.add("on");return}
+  const tt=t.closest("[data-type]");
+  if(tt){CHOICE.type=tt.querySelector("small").textContent+" · "+tt.querySelector(".w").textContent;
+    document.querySelectorAll("[data-type]").forEach(x=>x.classList.remove("on"));
+    tt.classList.add("on");return}
+  if(t.id==="v-send")send();
+});
+
+document.addEventListener("keydown",e=>{
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
+  if(e.key==="ArrowRight"||e.key===" "||e.key==="PageDown"){e.preventDefault();go(at+1)}
+  if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();go(at-1)}
+  if(e.key==="Home")go(0);
+  if(e.key==="End")go(slides.length-1);
+});
+
+let tx=null;
+document.addEventListener("touchstart",e=>{tx=e.touches[0].clientX},{passive:true});
+document.addEventListener("touchend",e=>{
+  if(tx===null)return;
+  const dx=e.changedTouches[0].clientX-tx;
+  if(Math.abs(dx)>60)go(at+(dx<0?1:-1));
+  tx=null;
+},{passive:true});
+
+async function send(){
+  const g=id=>document.getElementById(id);
+  const msg=g("v-msg"), btn=g("v-send");
+  const pass=g("v-pass").value.trim();
+  if(!pass){msg.className="msg bad";msg.textContent="The passphrase is missing.";return}
+  const body=["Layout: "+(g("v-lay").value||"—"),
+              "Palette: "+(g("v-pal").value||"—"),
+              "Door: "+(g("v-door").value||"—"),
+              "Name/type: "+(g("v-type").value||"—"),
+              "", g("v-note").value.trim()].join("\n").trim();
+  btn.disabled=true; msg.className="msg"; msg.textContent="Sending…";
+  try{
+    const r=await fetch("/api/notes",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({pass:pass,who:g("v-who").value,screen:"Deck — the vote",
+        verdict:"CHANGE",code:"VOTE",note:body})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){msg.className="msg bad";msg.textContent=d.error||"That didn't send.";btn.disabled=false;return}
+    msg.className="msg good";msg.textContent="Got it. Noted and timestamped.";
+  }catch(err){
+    msg.className="msg bad";msg.textContent="No connection — try again when you have signal.";
+    btn.disabled=false;
+  }
+}
+
+paint("graphite");
+go(0);
+</script>
+<script src="./ctrl-markup.js" defer></script>
