@@ -150,7 +150,10 @@ textarea{resize:vertical;min-height:86px;line-height:1.5}
 #app{display:flex;flex-direction:column;height:100%}
 header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap}
 .brand{font-size:15px;font-weight:700;letter-spacing:.16em;display:flex;align-items:baseline}
-.brand i{font-style:normal;color:var(--china)}
+.brand i{font-style:normal;color:var(--china);transition:opacity .12s}
+@keyframes blink{0%,44%{opacity:1}50%,94%{opacity:.12}100%{opacity:1}}
+body.rolling .brand i{animation:blink 1s steps(1,end) infinite}
+@media (prefers-reduced-motion:reduce){body.rolling .brand i{animation:none;opacity:1}}
 .slug{flex:1;min-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:11px}
 .tabs{display:flex;gap:3px}
 #clock{color:var(--dim);font-size:11px;letter-spacing:.08em}
@@ -267,10 +270,18 @@ tr.ngr{color:var(--dim)}
 .sw{width:26px;height:26px;border-radius:3px;border:1px solid var(--line2);cursor:pointer;position:relative;padding:0}
 .sw.on{outline:2px solid var(--chalk);outline-offset:2px}
 .sw i{position:absolute;right:2px;bottom:2px;width:8px;height:8px;border-radius:50%}
+.revgroup{display:flex;align-items:center;gap:5px;padding-left:12px;margin-left:4px;
+  border-left:1px dashed var(--line2)}
+.revgroup i{font-style:normal;font-size:8px;letter-spacing:.2em;color:var(--dim);
+  text-transform:uppercase;white-space:nowrap}
+button.rev{border-style:dashed;border-color:var(--line2);color:var(--dim);font-size:10px;padding:5px 9px}
+button.rev:hover{border-color:var(--china);color:var(--china)}
+@media (max-width:760px){.revgroup i{display:none}}
 #sheet{position:fixed;inset:0;z-index:75;background:var(--bg);display:none;flex-direction:column}
 #sheet.on{display:flex}
 #sheet .sbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);
   border-bottom:1px solid var(--line);flex:0 0 auto}
+#sheet .sbar .revtag{font-size:8.5px;letter-spacing:.2em;color:var(--china);border:1px dashed var(--china);padding:2px 6px;border-radius:2px;font-weight:400}
 #sheet .sbar span{flex:1;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
 #sheet iframe{flex:1;width:100%;border:0;background:var(--bg)}
 #help{position:fixed;inset:0;background:rgba(6,9,11,.94);display:none;place-items:center;z-index:70;padding:18px}
@@ -304,6 +315,8 @@ tr.ngr{color:var(--dim)}
 }
 </style>
 
+<datalist id="ielist"><option>INT</option><option>EXT</option><option>I/E</option></datalist>
+<datalist id="dnlist"><option>DAY</option><option>NIGHT</option><option>DUSK</option><option>DAWN</option><option>CONT</option><option>MAGIC HOUR</option></datalist>
 <div id="tally"></div>
 <div id="app">
 <header>
@@ -316,7 +329,7 @@ tr.ngr{color:var(--dim)}
     <button data-tab="log">Log</button>
     <button data-tab="report">Report</button>
     <button data-tab="day">Day</button>
-    <button data-open="./deck">The case</button><button data-open="./notes">Notes</button><button id="prefsbtn">⚙</button>
+    <span class="revgroup"><i>FOR REVIEW</i><button class="rev" data-open="./deck">The case</button><button class="rev" data-open="./notes">Send a note</button></span><button id="prefsbtn">⚙</button>
     <button id="helpbtn">?</button>
   </div>
 </header>
@@ -380,9 +393,9 @@ tr.ngr{color:var(--dim)}
     <span style="color:var(--dim);font-size:10.5px">Press <b>,</b> any time</span></div>
 </div></div>
 
-<div id="sheet"><div class="sbar"><span id="sheettitle"></span>
+<div id="sheet"><div class="sbar"><b class="revtag">FOR REVIEW</b><span id="sheettitle"></span>
   <button id="sheetout">Open in a tab</button><button id="sheetclose">Close</button></div>
-  <iframe id="sheetframe" title="panel"></iframe></div>
+  <div id="sheetwarn" style="display:none;padding:18px 20px;color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line)">Nothing loaded. This page only exists on the deployed site — try <b>Open in a tab</b>, or you are running the file locally.</div><iframe id="sheetframe" title="panel"></iframe></div>
 
 <div id="help"><div class="bx">
   <div class="lab">LINED. — the line is data</div>
@@ -499,6 +512,7 @@ function blank(){
     prod:{title:"",ep:"",dir:"",dop:"",scripty:"",unit:"Main",date:today(),day:1,days:1},
     times:{call:"",first:"",lunchOut:"",lunchIn:"",camWrap:"",wrap:""},
     scenes:[],setups:[],takes:[],lines:[],
+    fields:{setup:[],scene:[]},
     cur:{scene:null,setup:null},pdfName:null,
     ui:{layout:"three",pal:"graphite",flip:"0",door:"mono",bandh:"46%"}
   };
@@ -958,12 +972,18 @@ function renderTakes(){
     '<div class="mini'+(t.ng?" on":"")+'" data-x="'+t.id+'">✕</div></div>').join("")
     :'<div style="color:var(--dim);font-size:11px">No takes. <b>Space</b> to roll.</div>';
 }
+function customFields(kind){S.fields=S.fields||{setup:[],scene:[]};S.fields[kind]=S.fields[kind]||[];return S.fields[kind]}
 function renderSetupCard(){
   const u=curSetup();
   const el=document.getElementById("setupcard");
   if(!u){el.innerHTML='<div style="color:var(--dim);font-size:11px">—</div>';return}
   const f=(k,l)=>'<div class="field"><span class="lab">'+l+'</span><input data-su="'+k+'" data-id="'+u.id+'" value="'+esc(u[k])+'"></div>';
-  el.innerHTML=f("desc","Description")+f("size","Size")+f("mov","Move")+f("lens","Lens")+f("cam","Camera");
+  const cf=customFields("setup");
+  el.innerHTML=f("desc","Description")+f("size","Size")+f("mov","Move")+f("lens","Lens")+f("cam","Camera")+
+    cf.map(n=>'<div class="field"><span class="lab">'+esc(n)+
+      ' <b data-delfield="setup|'+esc(n)+'" style="cursor:pointer;color:var(--china);font-weight:400">\u00d7</b></span>'+
+      '<input data-sux="'+esc(n)+'" data-id="'+u.id+'" value="'+esc((u.x||{})[n])+'"></div>').join("")+
+    '<div class="field" style="align-self:end"><button id="addsufield" style="width:100%">+ Field</button></div>';
 }
 function dayStats(){
   const circ=S.takes.filter(t=>t.circled);
@@ -1009,8 +1029,9 @@ function renderLog(){
     takesOf(u.id).forEach(t=>{
       rows.push('<tr class="'+(t.circled?"circ":"")+(t.ng?" ngr":"")+'"><td>'+esc(s.num)+'</td><td>'+esc(u.letter)+
         '</td><td class="tk">'+(t.circled?"("+t.num+")":t.num)+'</td><td>'+fmt(t.dur)+'</td><td>'+esc(t.tod)+
-        '</td><td>'+esc(u.size)+'</td><td>'+esc(u.lens)+'</td><td>'+esc(u.cam)+'</td><td>'+cov+
-        '</td><td>'+esc(u.desc)+'</td><td><input data-note="'+t.id+'" value="'+esc(t.note)+'"></td></tr>');
+        '</td><td>'+esc(u.size)+'</td><td>'+esc(u.lens)+'</td><td>'+esc(u.cam)+'</td><td>'+cov+'</td>'+
+        customFields("setup").map(n=>'<td>'+esc((u.x||{})[n])+'</td>').join("")+
+        '<td>'+esc(u.desc)+'</td><td><input data-note="'+t.id+'" value="'+esc(t.note)+'"></td></tr>');
     });
   }));
   document.getElementById("logview").innerHTML=
@@ -1057,16 +1078,16 @@ function renderDay(){
     '<div class="row"><span class="lab">Production</span></div><div class="grid2" style="max-width:940px">'+
     f("title","Production")+f("ep","Episode")+f("date","Date","date")+f("day","Day","number")+f("days","of","number")+
     f("unit","Unit")+f("dir","Director")+f("dop","DP")+f("scripty","Script supervisor")+'</div>'+
-    '<div class="row" style="margin-top:20px"><span class="lab">Scenes</span><span style="flex:1"></span><button id="addscene2">+ Scene</button></div>'+
+    '<div class="row" style="margin-top:20px"><span class="lab">Scenes</span><span style="flex:1"></span><button id="addscenecol">+ Column</button><button id="addscene2">+ Scene</button></div>'+
     '<table style="max-width:1040px"><thead><tr><th>Scene</th><th>I/E</th><th>D/N</th><th>Location</th><th>Synopsis</th><th>Pages</th><th>Done</th><th></th></tr></thead><tbody>'+
     S.scenes.map(s=>'<tr>'+
       '<td style="width:66px"><input data-sc="num" data-id="'+s.id+'" value="'+esc(s.num)+'"></td>'+
-      '<td style="width:74px"><select data-sc="ie" data-id="'+s.id+'">'+["INT","EXT","I/E"].map(o=>'<option'+(s.ie===o?" selected":"")+">"+o+"</option>").join("")+'</select></td>'+
-      '<td style="width:86px"><select data-sc="dn" data-id="'+s.id+'">'+["DAY","NIGHT","DUSK","DAWN","CONT"].map(o=>'<option'+(s.dn===o?" selected":"")+">"+o+"</option>").join("")+'</select></td>'+
+      '<td style="width:74px"><input list="ielist" data-sc="ie" data-id="'+s.id+'" value="'+esc(s.ie)+'"></td>'+
+      '<td style="width:86px"><input list="dnlist" data-sc="dn" data-id="'+s.id+'" value="'+esc(s.dn)+'"></td>'+
       '<td><input data-sc="loc" data-id="'+s.id+'" value="'+esc(s.loc)+'"></td>'+
       '<td><input data-sc="syn" data-id="'+s.id+'" value="'+esc(s.syn)+'"></td>'+
       '<td style="width:78px"><input data-sc="pages" data-id="'+s.id+'" value="'+esc(s.pages)+'" placeholder="1 3/8"></td>'+
-      '<td style="width:52px;text-align:center"><input type="checkbox" style="width:auto" data-done="'+s.id+'"'+(s.done?" checked":"")+'></td>'+
+      customFields("scene").map(n=>'<td><input data-scx="'+esc(n)+'" data-id="'+s.id+'" value="'+esc((s.x||{})[n])+'"></td>').join("")+      '<td style="width:52px;text-align:center"><input type="checkbox" style="width:auto" data-done="'+s.id+'"'+(s.done?" checked":"")+'></td>'+
       '<td style="width:44px"><button data-del="'+s.id+'">Del</button></td></tr>').join("")+
     '</tbody></table><div class="row" style="margin-top:20px"><button id="newday">Start a new day</button></div>';
 }
@@ -1132,6 +1153,13 @@ document.addEventListener("click",e=>{
   if(su){S.cur.setup=su.dataset.setup;save();renderAll();drawLines();return}
   if(t.dataset.c){const k=S.takes.find(x=>x.id===t.dataset.c);k.circled=!k.circled;if(k.circled)k.ng=false;save();renderAll();return}
   if(t.dataset.x){const k=S.takes.find(x=>x.id===t.dataset.x);k.ng=!k.ng;if(k.ng)k.circled=false;save();renderAll();return}
+  if(t.dataset.delfield){
+    const parts=t.dataset.delfield.split("|"), kind=parts[0], name=parts[1];
+    if(confirm('Remove the "'+name+'" field? Anything written in it is lost.')){
+      S.fields[kind]=customFields(kind).filter(x=>x!==name);save();renderAll();
+    }
+    return;
+  }
   if(t.dataset.del){const s=scene(t.dataset.del);
     if(confirm("Delete scene "+s.num+", its setups, takes and lines?")){
       const ids=setupsOf(s.id).map(u=>u.id);
@@ -1152,6 +1180,10 @@ document.addEventListener("click",e=>{
   }
   switch(t.id){
     case"addscene":case"addscene2":addScene();renderAll();drawLines();break;
+    case"addsufield":{const n=prompt("Field name \u2014 e.g. Filter, FPS, Lens serial");
+      if(n&&n.trim()){customFields("setup").push(n.trim());save();renderAll()}break}
+    case"addscenecol":{const n=prompt("Column name \u2014 e.g. Wardrobe, Cast, Unit");
+      if(n&&n.trim()){customFields("scene").push(n.trim());save();renderAll()}break}
     case"addsetup":addSetup();renderAll();toast("Setup "+curScene().num+curSetup().letter);break;
     case"rollbtn":rolling?cut():roll();break;
     case"circbtn":{const k=lastTake();if(k){k.circled=!k.circled;if(k.circled)k.ng=false;save();renderAll()}break}
@@ -1172,11 +1204,15 @@ document.addEventListener("click",e=>{
       i.onchange=()=>{if(i.files[0])loadPDF(i.files[0])};i.click();break}
     case"csvbtn":{
       const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
-      const rows=[["Scene","IE","DN","Setup","Take","Circled","NG","Duration","Time","Size","Move","Lens","Cam","LinesCovered","SetupDesc","Note"]];
+      const rows=[["Scene","IE","DN","Setup","Take","Circled","NG","Duration","Time","Size","Move","Lens","Cam","LinesCovered"]
+        .concat(customFields("scene").map(n=>"Sc:"+n)).concat(customFields("setup")).concat(["SetupDesc","Note"])];
       S.scenes.forEach(s=>setupsOf(s.id).forEach(u=>{
         const cov=sceneCoverage(s.id).filter(c=>c.by.includes(u.id)).length;
         takesOf(u.id).forEach(t2=>rows.push([s.num,s.ie,s.dn,u.letter,t2.num,t2.circled?"Y":"",t2.ng?"Y":"",
-          fmt(t2.dur),t2.tod,u.size,u.mov,u.lens,u.cam,cov,u.desc,t2.note]));
+          fmt(t2.dur),t2.tod,u.size,u.mov,u.lens,u.cam,cov]
+          .concat(customFields("scene").map(n=>(s.x||{})[n]||""))
+          .concat(customFields("setup").map(n=>(u.x||{})[n]||""))
+          .concat([u.desc,t2.note])));
       }));
       dl("lined-day"+S.prod.day+".csv",rows.map(r=>r.map(q).join(",")).join("\n"));break;
     }
@@ -1196,6 +1232,8 @@ document.addEventListener("input",e=>{
   const t=e.target;
   if(t.dataset.note){const k=S.takes.find(x=>x.id===t.dataset.note);if(k)k.note=t.value;save();return}
   if(t.dataset.su){const u=setup(t.dataset.id);if(u){u[t.dataset.su]=t.value;renderSetups()}save();return}
+  if(t.dataset.sux){const u=setup(t.dataset.id);if(u){u.x=u.x||{};u.x[t.dataset.sux]=t.value}save();return}
+  if(t.dataset.scx){const s2=scene(t.dataset.id);if(s2){s2.x=s2.x||{};s2.x[t.dataset.scx]=t.value}save();return}
   if(t.dataset.sc){const s=scene(t.dataset.id);if(s){s[t.dataset.sc]=t.value;renderScenes();drawLines()}save();return}
   if(t.dataset.prod){S.prod[t.dataset.prod]=t.value;save();
     document.getElementById("slug").textContent=(S.prod.title||"Untitled")+" · Day "+S.prod.day+" of "+S.prod.days;return}
