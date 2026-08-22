@@ -1178,6 +1178,37 @@ document.addEventListener("click",e=>{
     if(w)w.scrollIntoView({behavior:"smooth",block:"center"});
     return;
   }
+  if(t.dataset.open){
+    const u=t.dataset.open;
+    const fr=document.getElementById("sheetframe");
+    fr.src=u;
+    document.getElementById("sheettitle").textContent=u.replace("./","");
+    const sh=document.getElementById("sheet");
+    sh.classList.add("on"); sh.dataset.url=u;
+    const warn=document.getElementById("sheetwarn");
+    if(warn){
+      warn.style.display="none";
+      clearTimeout(window._sheetT);
+      window._sheetT=setTimeout(function(){
+        let blank=true;
+        try{ blank=!fr.contentDocument||!fr.contentDocument.body||!fr.contentDocument.body.innerHTML.trim() }
+        catch(e){ blank=false }
+        if(blank)warn.style.display="";
+      },1500);
+    }
+    return;
+  }
+  if(t.id==="sheetclose"){
+    const sh=document.getElementById("sheet");
+    sh.classList.remove("on");
+    document.getElementById("sheetframe").src="about:blank";
+    return;
+  }
+  if(t.id==="sheetout"){
+    const sh=document.getElementById("sheet");
+    if(sh.dataset.url)window.open(sh.dataset.url,"_blank");
+    return;
+  }
   switch(t.id){
     case"addscene":case"addscene2":addScene();renderAll();drawLines();break;
     case"addsufield":{const n=prompt("Field name \u2014 e.g. Filter, FPS, Lens serial");
