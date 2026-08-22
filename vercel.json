@@ -20,5 +20,23 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/deck",
+      "destination": "/deck.html"
+    },
+    {
+      "source": "/notes",
+      "destination": "/notes.html"
+    },
+    {
+      "source": "/test",
+      "destination": "/test.html"
+    },
+    {
+      "source": "/door",
+      "destination": "/gate-preview.html"
+    }
   ]
 }

@@ -1,0 +1,169 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#12161A">
+<title>LINED. — is it working?</title>
+<style>
+:root{--bg:#12161A;--panel:#1B2127;--line:#2E3841;--fg:#E4EAEF;--dim:#7E8B95;
+  --go:#5FA88C;--red:#E5533D;--amber:#D8A13C;--mono:ui-monospace,"SF Mono",Menlo,monospace}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.6 var(--mono);padding:26px 20px 60px}
+.w{max-width:640px;margin:0 auto}
+h1{font-size:17px;letter-spacing:.18em;margin:0 0 2px;font-weight:700}
+h1 i{font-style:normal;color:var(--red)}
+.sub{color:var(--dim);font-size:12px;margin:0 0 24px}
+.r{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.dot{flex:0 0 10px;height:10px;border-radius:50%;background:var(--dim);margin-top:6px}
+.dot.ok{background:var(--go)}.dot.bad{background:var(--red)}.dot.warn{background:var(--amber)}
+.t{flex:1}
+.t b{display:block;font-weight:400;font-size:13.5px}
+.t span{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
+.t span.fix{color:var(--amber)}
+h2{font-size:10px;letter-spacing:.2em;color:var(--dim);font-weight:400;margin:26px 0 4px;text-transform:uppercase}
+.box{border:1px solid var(--line);background:var(--panel);padding:14px 16px;margin-top:26px}
+input{width:100%;background:#0F1317;border:1px solid var(--line);color:var(--fg);font:inherit;
+  padding:9px;border-radius:3px;margin-top:6px}
+button{font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--red);
+  border:0;color:#fff;padding:11px 16px;border-radius:3px;cursor:pointer;margin-top:10px}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.msg{font-size:12px;color:var(--dim);margin-top:10px;min-height:18px}
+.score{font-size:26px;font-weight:700;margin:0 0 18px}
+</style>
+<div class="w">
+  <h1>IS IT WORKING<i>?</i></h1>
+  <p class="sub">Every part of lined.film, checked. Reload to run again.</p>
+  <div class="score" id="score">…</div>
+  <div id="out"></div>
+
+  <div class="box">
+    <b style="font-weight:400">End-to-end test</b>
+    <div style="color:var(--dim);font-size:11.5px;margin-top:4px">
+      Writes a real note, then reads it back. Proves the whole chain.</div>
+    <input id="key" type="password" placeholder="NOTES_PASSWORD">
+    <button id="run">Send a test note</button>
+    <button class="ghost" id="clear">Clear service worker</button>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+<script>
+"use strict";
+var out=document.getElementById("out"), rows=[];
+function add(group,label,state,note,fix){
+  rows.push({group:group,label:label,state:state,note:note,fix:fix});
+  paint();
+}
+function paint(){
+  var g="",html="";
+  rows.forEach(function(r){
+    if(r.group!==g){g=r.group;html+='<h2>'+g+'</h2>'}
+    html+='<div class="r"><div class="dot '+r.state+'"></div><div class="t"><b>'+r.label+'</b>'+
+      (r.note?'<span>'+r.note+'</span>':'')+(r.fix?'<span class="fix">'+r.fix+'</span>':'')+'</div></div>';
+  });
+  out.innerHTML=html;
+  var ok=rows.filter(function(r){return r.state==="ok"}).length;
+  document.getElementById("score").textContent=ok+" of "+rows.length+" good";
+  document.getElementById("score").style.color=
+    ok===rows.length?"var(--go)":(rows.some(function(r){return r.state==="bad"})?"var(--red)":"var(--amber)");
+}
+
+(async function(){
+  // ── the basics ──
+  add("The site","HTTPS", location.protocol==="https:"?"ok":"bad",
+      location.protocol, location.protocol==="https:"?"":"Vercel issues this automatically once DNS resolves");
+  add("The site","Address", location.hostname==="lined.film"?"ok":"warn", location.hostname,
+      location.hostname==="lined.film"?"":"Working, but not on the real domain yet");
+
+  // ── the pages ──
+  for (const [name,path] of [["The app","/"],["The deck","/deck"],["The notes form","/notes"]]) {
+    try{
+      const r=await fetch(path,{method:"GET",cache:"no-store"});
+      add("Pages",name+"  "+path, r.ok?"ok":"bad", "HTTP "+r.status,
+          r.ok?"":"404 usually means the folder was deployed one level too deep");
+    }catch(e){ add("Pages",name+"  "+path,"bad","couldn't reach it",""); }
+  }
+
+  // ── the functions ──
+  try{
+    const r=await fetch("/api/notes",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({pass:"__probe__",note:"probe"})});
+    if(r.status===401) add("Server","Note intake","ok","configured and rejecting bad passwords","");
+    else if(r.status===500) add("Server","Note intake","bad","running, but not configured",
+      "Add NOTES_PASSWORD, SUPABASE_URL, SUPABASE_SERVICE_KEY in Vercel, then redeploy");
+    else if(r.status===404) add("Server","Note intake","bad","function not found",
+      "The api folder didn't deploy — check the folder level");
+    else add("Server","Note intake","warn","HTTP "+r.status,"");
+  }catch(e){ add("Server","Note intake","bad","no response",""); }
+
+  try{
+    const r=await fetch("/api/notes-list",{headers:{"x-notes-key":"__probe__"}});
+    if(r.status===401) add("Server","Note read-back","ok","configured","");
+    else if(r.status===500) add("Server","Note read-back","bad","not configured","Same variables as above");
+    else if(r.status===404) add("Server","Note read-back","warn","missing",
+      "Redeploy with the latest folder — this one is new");
+    else add("Server","Note read-back","warn","HTTP "+r.status,"");
+  }catch(e){ add("Server","Note read-back","bad","no response",""); }
+
+  // ── the app shell ──
+  try{
+    const r=await fetch("/manifest.webmanifest",{cache:"no-store"});
+    add("Installable","Manifest", r.ok?"ok":"bad","HTTP "+r.status,"");
+  }catch(e){ add("Installable","Manifest","bad","missing",""); }
+
+  try{
+    const r=await fetch("/icons/icon-192.png",{cache:"no-store"});
+    add("Installable","Icons", r.ok?"ok":"bad","HTTP "+r.status,"");
+  }catch(e){ add("Installable","Icons","bad","missing",""); }
+
+  if("serviceWorker" in navigator){
+    const regs=await navigator.serviceWorker.getRegistrations();
+    add("Installable","Service worker", regs.length?"ok":"warn",
+        regs.length?regs.length+" registered — works offline":"not registered yet",
+        regs.length?"":"Open the app once, then come back");
+    try{
+      const t=await fetch("/sw.js",{cache:"no-store"});
+      const txt=await t.text();
+      const m=txt.match(/CACHE\s*=\s*"([^"]+)"/);
+      add("Installable","Cache version", m?"ok":"warn", m?m[1]:"couldn't read",
+          "If the site looks old, hard refresh: Cmd+Shift+R");
+    }catch(e){}
+  } else add("Installable","Service worker","warn","not supported here","");
+
+  try{ localStorage.setItem("t","1"); localStorage.removeItem("t");
+    add("Browser","Local storage","ok","the app can remember a day","");
+  }catch(e){ add("Browser","Local storage","bad","blocked",
+    "Private browsing — the app can't save. Use a normal window."); }
+})();
+
+document.getElementById("run").addEventListener("click", async function(){
+  var m=document.getElementById("msg"), key=document.getElementById("key").value.trim();
+  if(!key){m.textContent="Passphrase first.";return}
+  m.textContent="Writing…";
+  var stamp="selftest "+new Date().toISOString();
+  try{
+    var w=await fetch("/api/notes",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({pass:key,who:"self-test",screen:"Diagnostics",verdict:"KEEP",
+        code:"TEST",note:stamp})});
+    var d=await w.json().catch(function(){return{}});
+    if(!w.ok){m.textContent="Write failed — "+(d.error||w.status);return}
+    m.textContent="Written. Reading back…";
+    var r=await fetch("/api/notes-list",{headers:{"x-notes-key":key}});
+    if(!r.ok){m.textContent="Written, but read-back failed. Note is safe in Supabase.";return}
+    var rows=await r.json();
+    var found=rows.some(function(x){return x.note===stamp});
+    m.innerHTML=found
+      ? '<span style="color:var(--go)">Whole chain works — form, server, database, read-back.</span>'
+      : '<span style="color:var(--amber)">Written, but not found on read-back. Check the table.</span>';
+  }catch(e){ m.textContent="No connection."; }
+});
+
+document.getElementById("clear").addEventListener("click", async function(){
+  if("serviceWorker" in navigator){
+    var regs=await navigator.serviceWorker.getRegistrations();
+    for (const r of regs) await r.unregister();
+  }
+  if(window.caches){ const k=await caches.keys(); for (const n of k) await caches.delete(n); }
+  document.getElementById("msg").textContent="Cleared. Reload the app to get the newest version.";
+});
+</script>

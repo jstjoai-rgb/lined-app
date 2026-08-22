@@ -267,6 +267,12 @@ tr.ngr{color:var(--dim)}
 .sw{width:26px;height:26px;border-radius:3px;border:1px solid var(--line2);cursor:pointer;position:relative;padding:0}
 .sw.on{outline:2px solid var(--chalk);outline-offset:2px}
 .sw i{position:absolute;right:2px;bottom:2px;width:8px;height:8px;border-radius:50%}
+#sheet{position:fixed;inset:0;z-index:75;background:var(--bg);display:none;flex-direction:column}
+#sheet.on{display:flex}
+#sheet .sbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);
+  border-bottom:1px solid var(--line);flex:0 0 auto}
+#sheet .sbar span{flex:1;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+#sheet iframe{flex:1;width:100%;border:0;background:var(--bg)}
 #help{position:fixed;inset:0;background:rgba(6,9,11,.94);display:none;place-items:center;z-index:70;padding:18px}
 #help.on{display:grid}
 #help .bx{background:var(--panel);border:1px solid var(--line2);padding:18px 20px;max-width:560px;width:100%;max-height:88%;overflow:auto}
@@ -310,7 +316,7 @@ tr.ngr{color:var(--dim)}
     <button data-tab="log">Log</button>
     <button data-tab="report">Report</button>
     <button data-tab="day">Day</button>
-    <button id="prefsbtn">⚙</button>
+    <button data-open="./deck">The case</button><button data-open="./notes">Notes</button><button id="prefsbtn">⚙</button>
     <button id="helpbtn">?</button>
   </div>
 </header>
@@ -373,6 +379,10 @@ tr.ngr{color:var(--dim)}
   <div class="row" style="margin-top:16px"><button id="closeprefs">Done</button>
     <span style="color:var(--dim);font-size:10.5px">Press <b>,</b> any time</span></div>
 </div></div>
+
+<div id="sheet"><div class="sbar"><span id="sheettitle"></span>
+  <button id="sheetout">Open in a tab</button><button id="sheetclose">Close</button></div>
+  <iframe id="sheetframe" title="panel"></iframe></div>
 
 <div id="help"><div class="bx">
   <div class="lab">LINED. — the line is data</div>
@@ -1214,7 +1224,7 @@ document.addEventListener("keydown",e=>{
   if(k==="x"){const t=lastTake();if(t){t.ng=!t.ng;if(t.ng)t.circled=false;save();renderAll()}return}
   if(e.key===","){buildPrefs();document.getElementById("prefs").classList.add("on");return}
   if(k==="?"){document.getElementById("help").classList.add("on");return}
-  if(k==="escape"){document.getElementById("help").classList.remove("on");document.getElementById("prefs").classList.remove("on");return}
+  if(k==="escape"){document.getElementById("help").classList.remove("on");document.getElementById("prefs").classList.remove("on");const sh=document.getElementById("sheet");if(sh.classList.contains("on")){sh.classList.remove("on");document.getElementById("sheetframe").src="about:blank"}return}
   if(e.key==="ArrowUp"||e.key==="ArrowDown"){
     e.preventDefault();if(!S.scenes.length)return;
     let i=S.scenes.findIndex(s=>s.id===S.cur.scene);
