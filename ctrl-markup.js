@@ -59,7 +59,7 @@
     "#ctrlmk{position:fixed;inset:0;z-index:2147483000;pointer-events:none}",
     "#ctrlmk.on{pointer-events:auto;touch-action:none;cursor:crosshair}",
     "#ctrlmk svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}",
-    "#ctrlbar{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:2147483100;",
+    "#ctrlbar{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:2147483100;",
     "  display:flex;gap:5px;background:#12161A;border:1px solid #3E4A55;border-radius:6px;padding:5px;",
     "  box-shadow:0 8px 30px rgba(0,0,0,.45)}",
     "#ctrlbar button{font:inherit;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;",
@@ -269,10 +269,13 @@
   }
 
   var open = document.createElement("button");
-  open.textContent = "\u270E MARK UP";
-  open.style.cssText = "position:fixed;bottom:14px;right:14px;z-index:2147483100;font:11px/1 ui-monospace,Menlo,monospace;" +
+  open.textContent = "\u270E";
+  open.style.cssText = "position:fixed;bottom:10px;right:10px;z-index:2147483100;opacity:.42;font:11px/1 ui-monospace,Menlo,monospace;" +
     "letter-spacing:.12em;background:#12161A;color:#E4EAEF;border:1px solid #3E4A55;border-radius:5px;" +
-    "padding:10px 13px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.4)";
+    "padding:8px 11px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35);border-radius:50%;line-height:1;transition:opacity .15s";
+  open.title = "Mark up this page  (M)";
+  open.onmouseenter = function(){ open.style.opacity = "1"; };
+  open.onmouseleave = function(){ open.style.opacity = ".42"; };
   open.onclick = function () { toggle(true); };
   document.body.appendChild(open);
   var mo = new MutationObserver(function () { open.style.display = state.on ? "none" : "block"; });
